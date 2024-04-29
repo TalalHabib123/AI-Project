@@ -13,21 +13,26 @@ datagen = ImageDataGenerator(
 
 data=pd.read_csv('processed_data.csv')
 newdata = pd.DataFrame(columns=['image', 'label'])
+min_images = [30, 5, 66, 104, 31, 295, 239]
 
 for index, row in tqdm(data.iterrows()):
     image = row['image']
     label = row['label']
     img = load_img('images/'+image+'.jpg')
-    img = img.resize((224, 224))
-    img.save('augmented_data/'+image+'.jpg')
+    img = img.resize((400, 400))
+    copy = img.copy()
+    copy = copy.convert('L')
+    copy.save('augmented_data/'+image+'.jpg')
     x = img_to_array(img)
     x = x.reshape((1,) + x.shape)
     for i , batch in enumerate(datagen.flow(x, batch_size=1)):
         img = Image.fromarray(batch[0].astype('uint8'))
+        img = img.resize((400, 400))
+        img = img.convert('L')
         img.save('augmented_data/'+image+'_'+str(i)+'.jpg')
         temp_data = pd.DataFrame({'image': [image+'_'+str(i)], 'label': [label]})
         newdata = pd.concat([newdata, temp_data], ignore_index=True)
-        if i >= 5:
+        if i >= min_images[label]:
                 break
 
 data = pd.concat([data, newdata], ignore_index=True)

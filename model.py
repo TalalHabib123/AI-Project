@@ -22,8 +22,6 @@ if gpus:
     try:
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
-        # logical_gpus = tf.config.experimental.list_logical_devices('GPU')
-        # print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
     except RuntimeError as e:
         print(e)
 
@@ -40,16 +38,17 @@ with tf.device('/GPU:0'):
     train_df = pd.DataFrame({'filename': X_train, 'class': y_train.astype('str')})
     test_df = pd.DataFrame({'filename': X_test, 'class': y_test.astype('str')})
 
-    image_size = (224, 224)
+    image_size = (400, 400)
 
     train_generator = train_datagen.flow_from_dataframe(train_df, x_col='filename', y_col='class', target_size=image_size, class_mode='categorical')
     test_generator = test_datagen.flow_from_dataframe(test_df, x_col='filename', y_col='class', target_size=image_size, class_mode='categorical')
+    prediction_generator = test_datagen.flow_from_dataframe(test_df, x_col='filename', target_size=image_size, class_mode=None, shuffle=False)
 
     if os.path.isfile('model.h5'):
         model = load_model('model.h5')
         
     else:
-        base_model = Xception(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+        base_model = DenseNet201(weights='imagenet', include_top=False, input_shape=(400, 400, 3))
 
         for layer in base_model.layers:
             layer.trainable = False
@@ -57,25 +56,44 @@ with tf.device('/GPU:0'):
         x = base_model.output
         x = GlobalMaxPooling2D()(x)
         x = Flatten()(x)
-        x = Dense(1024, activation='relu')(x)
+        x = Dense(2048, activation='swish')(x)
+        # x = Dropout(0.5)(x)
+        x = Dense(2048, activation='swish')(x)
+        # x = Dropout(0.5)(x)
+        x = Dense(2048, activation='swish')(x)
         x = Dropout(0.5)(x)
-        x = Dense(1024, activation='relu')(x)
+        x = Dense(2048, activation='swish')(x)
+        # x = Dropout(0.5)(x)
+        x = Dense(2048, activation='swish')(x)
+        # x = Dropout(0.5)(x)
+        x = Dense(2048, activation='swish')(x)
         x = Dropout(0.5)(x)
-        x = Dense(1024, activation='relu')(x)
+        x = Dense(1024, activation='swish')(x)
+        # x = Dropout(0.5)(x)
+        x = Dense(1024, activation='swish')(x)
+        # x = Dropout(0.5)(x)
+        x = Dense(1024, activation='swish')(x)
         x = Dropout(0.5)(x)
-        x = Dense(1024, activation='relu')(x)
+        x = Dense(1024, activation='swish')(x)
         x = Dropout(0.5)(x)
+        x = Dense(1024, activation='swish')(x)
+        # x = Dropout(0.25)(x)
+    
         predictions = Dense(7, activation='softmax')(x)
 
         model = Model(inputs=base_model.input, outputs=predictions)
 
-        model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer=Adam(learning_rate=0.1), loss='categorical_crossentropy', metrics=['accuracy'])
 
-        model.fit(train_generator, epochs=10, verbose=1, validation_data=test_generator)
+        model.fit(train_generator, epochs=15, verbose=1, validation_data=test_generator)
         
         model.save('model.h5')
 
-    predictions = model.predict(test_generator)
+    stimulate_predictions =[]
+    for _ in range(10):
+        predictions = model.predict(prediction_generator, verbose=1)
+        stimulate_predictions.append(predictions)
+    predictions = np.mean(np.array(stimulate_predictions), axis=0)
     labels = np.argmax(predictions, axis=1)
     
     temp = pd.DataFrame(predictions, columns=['MEL', 'NV', 'BCC', 'AKIEC', 'BKL', 'DF', 'VASC'])
