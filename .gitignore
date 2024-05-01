@@ -5,3 +5,4 @@ metadata.csv
 /augmented_data/
 augmented_data.zip
 /Trained_model/
+model.h5
