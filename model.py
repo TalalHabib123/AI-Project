@@ -2,18 +2,20 @@ import pandas as pd
 import os
 import numpy as np
 import random
+import pickle
 from sklearn.metrics import accuracy_score
 from keras.models import load_model
-from keras.applications import DenseNet201, Xception
+from keras.applications import DenseNet201
 from sklearn.model_selection import train_test_split
 from keras.models import Model
-from keras.layers import Dense, Dropout, Flatten, MaxPooling2D, GlobalMaxPooling2D, Conv2D
+from keras.layers import Dense, Dropout, Flatten, MaxPooling2D, Conv2D, BatchNormalization, Activation
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
 from keras.applications.densenet import preprocess_input
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import seaborn as sns
+import cv2
 
 RETRAIN = False
 
@@ -32,8 +34,14 @@ if gpus:
 
 with tf.device('/GPU:0'):
 
-    train_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)
-    test_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)
+    def preprocess_image(img):
+        if len(img.shape) == 2 or img.shape[2] == 1:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        img = preprocess_input(img)
+        return img
+    
+    train_datagen = ImageDataGenerator(preprocessing_function=preprocess_image)
+    test_datagen = ImageDataGenerator(preprocessing_function=preprocess_image)
 
     data = pd.read_csv('augmented_data.csv')
     data['image'] = data['image'].apply(lambda x: 'augmented_data/' + x + '.jpg')
@@ -57,95 +65,75 @@ with tf.device('/GPU:0'):
 
         for layer in base_model.layers:
             layer.trainable = False
+            
+        # x = base_model.output
+        # x = MaxPooling2D()(x)
+        # x = Conv2D(1024, (3, 3), activation='relu', padding="same")(x)
+        # x = MaxPooling2D()(x)
+        # x = Dropout(0.3)(x)
+        # x = Conv2D(512, (3, 3), activation='relu', padding="same")(x)
+        # x = MaxPooling2D()(x)
+        # x = Dropout(0.3)(x)
+        # x = Conv2D(256, (3, 3), activation='relu', padding="same")(x)
+        # x = Dropout(0.3)(x)
+        # x = Flatten()(x)
+        # x = Dense(60, activation='relu')(x)
 
-        # x = base_model.output
-        # x = GlobalMaxPooling2D()(x)
-        # x = Flatten()(x)
-        # x = Dense(2048, activation='relu')(x)
-        # x = Dropout(0.5)(x)
-        # x = Dense(2048, activation='relu')(x)
-        # x = Dropout(0.5)(x)
-        # x = Dense(2048, activation='relu')(x)
-        # x = Dropout(0.5)(x)
-        # x = Dense(2048, activation='relu')(x)
-        # # x = Dropout(0.5)(x)
-        # x = Dense(2048, activation='relu')(x)
-        # # x = Dropout(0.5)(x)
-        # x = Dense(1024, activation='relu')(x)
-        # x = Dropout(0.5)(x)
-        # # x = Dropout(0.5)(x)
-        # x = Dense(1024, activation='relu')(x)
-        # # x = Dropout(0.5)(x)
-        # # x = Dense(1024, activation='relu')(x)
-        # # # x = Dropout(0.5)(x)
-        # x = Dense(1024, activation='relu')(x)
-        # x = Dropout(0.5)(x)
-        # x = Dense(1024, activation='relu')(x)
-        # # x = Dropout(0.25)(x)
-        
-        # x = base_model.output
-        # x = MaxPooling2D()(x)
-        # x =Conv2D(1024, (3, 3), activation='relu')(x)
-        # x =MaxPooling2D()(x)
-        # x =Dropout(0.3)(x)
-        # x =Conv2D(1024, (3, 3), activation='relu')(x)
-        # x =MaxPooling2D()(x)
-        # x =Dropout(0.3)(x)
-        # x =Conv2D(1024, (3, 3), activation='relu')(x)
-        # x =MaxPooling2D()(x)
-        # x =Dropout(0.3)(x)
-        # x = Flatten()(x)
-        # x = Dense(1024, activation='relu')(x)
-        
-        
+
         x = base_model.output
-        x = GlobalMaxPooling2D()(x)
+        x = MaxPooling2D()(x)
+        x = Conv2D(1024, (3, 3), padding="same")(x)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
+        x = MaxPooling2D()(x)
+        x = Dropout(0.3)(x)
+
+        x = Conv2D(512, (3, 3), padding="same")(x)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
+        x = MaxPooling2D()(x)
+        x = Dropout(0.3)(x)
+
+        x = Conv2D(256, (3, 3), padding="same")(x)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
+        x = Dropout(0.3)(x)
+
         x = Flatten()(x)
-        # x = Dense(2048, activation='relu')(x)
-        # x = Dropout(0.5)(x)
-        # x = Dense(2048, activation='relu')(x)
-        # x = Dense(2048, activation='relu')(x)
-        # x = Dropout(0.5)(x)
-        # x = Dense(2048, activation='relu')(x)
-        x = Dense(1024, activation='relu')(x)
-        x = Dropout(0.5)(x)
-        x = Dense(1024, activation='relu')(x)
-        x = Dense(1024, activation='relu')(x)
-        x = Dropout(0.5)(x)
-        x = Dense(1024, activation='relu')(x)
+        x = Dense(60)(x)
+        x = BatchNormalization()(x)
+        x = Activation('relu')(x)
         
-        # x = base_model.output
-        # x = MaxPooling2D()(x)
-        # x = Flatten()(x)
-        # x = Dense(1024, activation='relu')(x)
-        # x = Dropout(0.5)(x)
-        # x = Dense(1024, activation='relu')(x)
-        # # x = Dropout(0.5)(x)
-        # x = Dense(1024, activation='relu')(x)
-        # x = Dropout(0.5)(x)
-        # x = Dense(1024, activation='relu')(x)
-        # x = Dense(1024, activation='relu')(x)
-        # x = Dropout(0.5)(x)
-        # x = Dense(1024, activation='relu')(x)
-        # x = Dense(1024, activation='relu')(x)
-        # # x = Dropout(0.25)(x)
-    
         predictions = Dense(7, activation='softmax')(x)
 
         model = Model(inputs=base_model.input, outputs=predictions)
 
         model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])
 
-        model.fit(train_generator, epochs=3, batch_size=64, verbose=1, validation_data=test_generator)
+        history = model.fit(train_generator, epochs=3, batch_size=64, verbose=1, validation_data=test_generator)
+        
+        #Save history in pickle file
+        with open('history.pkl', 'wb') as file_pi:
+            pickle.dump(history.history, file_pi)
         
         model.save('model.h5')
 
     if RETRAIN:
-        model.fit(train_generator, epochs=12, batch_size=64, verbose=1, validation_data=test_generator)
+        history = model.fit(train_generator, epochs=1, batch_size=64, verbose=1, validation_data=test_generator)
+        
+        if os.path.isfile('history.pkl'):
+            with open('history.pkl', 'rb') as file_pi:
+                old_history = pickle.load(file_pi)
+        else:
+            old_history = {'loss': [], 'accuracy': [], 'val_loss': [], 'val_accuracy': []}
+            
+        for key in history.history.keys():
+            old_history[key].extend(history.history[key])
+            
         model.save('model.h5')
         
     stimulate_predictions =[]
-    for _ in range(1):
+    for _ in range(2):
         predictions = model.predict(prediction_generator, verbose=1)
         stimulate_predictions.append(predictions)
     predictions = np.mean(np.array(stimulate_predictions), axis=0)
@@ -201,5 +189,31 @@ with tf.device('/GPU:0'):
 
     plt.tight_layout()
     plt.show()
+    # Set seaborn style
+    sns.set_theme(style='whitegrid')
+    plt.figure(figsize=(12, 6))
+    
+    plt.subplot(1, 2, 1)
+    plt.plot(history.history['accuracy'], 'o-', label='Train Accuracy')
+    plt.plot(history.history['val_accuracy'], 'o-', label='Validation Accuracy')
+    plt.title('Model Accuracy')
+    plt.ylabel('Accuracy')
+    plt.xlabel('Epoch')
+    plt.grid(True)
+    plt.legend(loc='lower right')
+    
+    plt.subplot(1, 2, 2)
+    plt.plot(history.history['loss'], 'o-', label='Train Loss')
+    plt.plot(history.history['val_loss'], 'o-', label='Validation Loss')
+    plt.title('Model Loss')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.grid(True)
+    plt.legend(loc='upper right')
+    
+    plt.tight_layout()
+    
+    plt.show()
+    
     
     
